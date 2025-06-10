@@ -1,0 +1,92 @@
+# Run with: ansible-playbook -i ../terraform-openstack/openstack-inventory.txt deploy.yml
+---
+# Begin: Prerequisites
+- hosts: all
+  name: Prerequisites
+  gather_facts: false
+  user: ubuntu
+  become: true
+  become_user: root
+  tasks:
+    - name: Wait for ssh
+      ansible.builtin.wait_for_connection:
+    - name: Wait for cloud-init to finish
+      ansible.builtin.raw: while [ ! -f /var/lib/cloud/instance/boot-finished]; do sleep 10s; done
+      retries: 10
+      delay: 1
+    - name: Install python 3 (if not installed)
+      ansible.builtin.raw: if [ ! -e /usr/bin/python3 ]; then apt -y update; apt install -y python3; fi
+# End: Prerequisites
+
+# Begin: Install Software
+- hosts: all
+  name: Install Software
+  user: ubuntu
+  become: true
+  become_user: root
+  tasks:
+    # Install nodejs/npm
+    - name: Install nodejs/npm
+      ansible.builtin.apt:
+        name: ["nodejs", "npm"]
+        update_cache: yes
+        state: latest
+
+    # Copy systemd file
+    - name: Copy systemd service file to server
+      ansible.builtin.copy:
+        src: myapp.service
+        dest: /etc/systemd/system
+        owner: root
+        group: root
+# End: Install Software
+
+# Begin: Copy application
+- hosts: all
+  user: ubuntu
+  tasks:
+    # Create a directory if it doesn't exist
+    - ansible.builtin.file:
+        path: /home/ubuntu/app
+        state: directory
+        mode: 0755
+
+    # Copy app to the destination directory
+    - ansible.builtin.copy:
+        src: app/server.js
+        dest: /home/ubuntu/app/server.js
+        mode: 0644
+
+    - ansible.builtin.copy:
+        src: app/package.json
+        dest: /home/ubuntu/app/package.json
+        mode: 0644
+# End: Copy application
+
+# Begin: Dependencies
+- hosts: all
+  user: ubuntu
+  tasks:
+    # Install packages required by the app
+    - name: Install packages based on package.json.
+      npm:
+        path: /home/ubuntu/app/
+# End: Dependencies
+
+# Begin: (Re-)Start app
+- hosts: all
+  user: ubuntu
+  become: yes
+  become_user: root
+  tasks:
+    - name: Enable service myapp and ensure it is not masked
+      ansible.builtin.systemd:
+        name: myapp
+        enabled: true
+        masked: false
+        daemon_reload: true
+    - name: (Re-)start app using systemd
+      ansible.builtin.systemd:
+        name: myapp
+        state: restarted
+# End: (Re-)Start app
