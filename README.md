@@ -2,9 +2,9 @@
 
 STEPS:
 
-- Configure env.sh
+- Configure `env.sh`:
 
-```
+```sh
 export OS_AUTH_URL="https://stack.dhbw.cloud:5000"
 export OS_USERNAME="pfisterer-cloud-lecture"
 export OS_PASSWORD="ss2025"
@@ -13,10 +13,10 @@ export OS_USER_DOMAIN_NAME="default"
 # TODO: export OS_KEY="silasschroeder"
 ```
 
-- $ source env.sh
-- $ terraform init
-- $ terraform apply
-- $ ansible-playbook -i openstack-inventory.txt ansible-config.yml
+- `$ source env.sh`
+- `$ terraform init`
+- `$ terraform apply`
+- `$ ansible-playbook -i openstack-inventory.txt ansible-config.yml`
 
 TODO:
 
@@ -26,6 +26,10 @@ TODO:
 - Task 1
 
   - Demonstrate immutable update
+  - Nach Änderung:
+
+    - terraform plan <-- Zeigt Änderungen, oder "No changes. Your infrastructure matches the configuration."
+    - terraform apply <-- Löscht aktuelle Instanz und erstellt Neue
 
 - Task 2
 
