@@ -25,16 +25,13 @@ resource "openstack_compute_instance_v2" "master_nodes" {
   flavor_name     = "mb1.small"
   security_groups = ["default"]
   key_pair        = "silasschroeder"
-  user_data       = file("${path.module}/MasterWorkerStructure/master.sh")
+  user_data       = file("${path.module}/master.sh")
 
   network {
     name = "provider_912"
   }
   provisioner "local-exec" {
-    command = "ssh-keygen -R ${self.network.0.fixed_ip_v4}" # Remove old host key
-  }
-  provisioner "local-exec" { # write ip to file
-    command = "echo ${self.network.0.fixed_ip_v4} > ${path.module}/MasterWorkerStructure/k8s_master_ip.txt"
+    command = "ssh-keygen -R ${self.network.0.fixed_ip_v4}" # Eliminates the problem of being unable to ssh to the VM
   }
 }
 
@@ -52,11 +49,13 @@ curl -L https://github.com/saltstack/salt-bootstrap/releases/latest/download/boo
 chmod +x /tmp/bootstrap-salt.sh
 sudo /tmp/bootstrap-salt.sh -A ${openstack_compute_instance_v2.master_nodes[0].network.0.fixed_ip_v4}
 EOF
-  provisioner "local-exec" {
-    command = "ssh-keygen -R ${self.network.0.fixed_ip_v4}" # Remove old host key
-  }
+
   network {
     name = "provider_912"
+  }
+
+  provisioner "local-exec" {
+    command = "ssh-keygen -R ${self.network.0.fixed_ip_v4}" # Eliminates the problem of being unable to ssh to the VM
   }
 
   depends_on = [openstack_compute_instance_v2.master_nodes] # Ensure master is created first
