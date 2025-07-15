@@ -1,3 +1,10 @@
+# Output aller privaten IPs für Ansible/Terraform Inventory
+output "all_private_ips" {
+  value = flatten([
+    openstack_compute_instance_v2.master.network[0].fixed_ip_v4,
+    openstack_compute_instance_v2.worker_nodes[*].network[0].fixed_ip_v4
+  ])
+}
 variable "worker_count" {
   default = 2
 }
@@ -19,7 +26,7 @@ resource "openstack_compute_instance_v2" "master" {
   image_id        = "c57c2aef-f74a-4418-94ca-d3fb169162bf"
   flavor_name     = "mb1.small"
   security_groups = ["default"]
-  key_pair        = "silasschroeder"
+  key_pair        = "chrisfisch"
   user_data       = file("${path.module}/master.sh")
 
   network {
@@ -36,7 +43,7 @@ resource "openstack_compute_instance_v2" "worker_nodes" {
   image_id        = "c57c2aef-f74a-4418-94ca-d3fb169162bf"
   flavor_name     = "mb1.small"
   security_groups = ["default"]
-  key_pair        = "silasschroeder"
+  key_pair        = "chrisfisch"
   user_data = templatefile("${path.module}/worker.sh", {
     master_ip = openstack_compute_instance_v2.master.network.0.fixed_ip_v4
   })

@@ -39,3 +39,8 @@ TODO:
 - Task 3
 
   - Install kubernetes
+
+- Task 4
+
+  - Install MinIO as Datalake on the Multi-Node Architecture
+  - Save a example Dataset using PySpark

@@ -1,0 +1,102 @@
+---
+- name: Hadoop Datalake Installation
+  hosts: all
+  become: yes
+  vars:
+    hadoop_version: "3.3.6"
+    hadoop_home: "/opt/hadoop"
+    java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+    master_host: "{{ groups['master'][0] }}"
+    worker_hosts: "{{ groups['worker'] }}"
+  tasks:
+    - name: Installiere benötigte Pakete
+      apt:
+        name:
+          - openjdk-11-jdk
+          - ssh
+          - rsync
+        update_cache: yes
+
+    - name: Lade Hadoop herunter
+      get_url:
+        url: "https://downloads.apache.org/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}.tar.gz"
+        dest: "/tmp/hadoop-{{ hadoop_version }}.tar.gz"
+
+    - name: Entpacke Hadoop
+      unarchive:
+        src: "/tmp/hadoop-{{ hadoop_version }}.tar.gz"
+        dest: /opt
+        remote_src: yes
+      args:
+        creates: "{{ hadoop_home }}"
+
+    - name: Setze Hadoop-Verzeichnis
+      file:
+        src: "/opt/hadoop-{{ hadoop_version }}"
+        dest: "{{ hadoop_home }}"
+        state: link
+      when: not (hadoop_home is directory)
+
+    - name: Setze Umgebungsvariablen
+      copy:
+        dest: /etc/profile.d/hadoop.sh
+        content: |
+          export JAVA_HOME={{ java_home }}
+          export HADOOP_HOME={{ hadoop_home }}
+          export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+        mode: '0644'
+
+    - name: Lade Umgebungsvariablen
+      shell: source /etc/profile.d/hadoop.sh
+      args:
+        executable: /bin/bash
+
+    - name: Erstelle HDFS-Verzeichnisse
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      loop:
+        - /opt/hadoop_data/hdfs/namenode
+        - /opt/hadoop_data/hdfs/datanode
+
+    - name: Konfiguriere core-site.xml
+      template:
+        src: core-site.xml.j2
+        dest: "{{ hadoop_home }}/etc/hadoop/core-site.xml"
+
+    - name: Konfiguriere hdfs-site.xml
+      template:
+        src: hdfs-site.xml.j2
+        dest: "{{ hadoop_home }}/etc/hadoop/hdfs-site.xml"
+
+    - name: Konfiguriere mapred-site.xml
+      template:
+        src: mapred-site.xml.j2
+        dest: "{{ hadoop_home }}/etc/hadoop/mapred-site.xml"
+
+    - name: Konfiguriere yarn-site.xml
+      template:
+        src: yarn-site.xml.j2
+        dest: "{{ hadoop_home }}/etc/hadoop/yarn-site.xml"
+
+    - name: Schreibe Worker-Liste
+      copy:
+        dest: "{{ hadoop_home }}/etc/hadoop/workers"
+        content: |
+          {% for host in worker_hosts %}{{ host }}
+          {% endfor %}
+        mode: '0644'
+
+  handlers:
+    - name: Format HDFS (nur auf Master)
+      command: "{{ hadoop_home }}/bin/hdfs namenode -format -force"
+      when: inventory_hostname == master_host
+
+    - name: Starte Hadoop-Dienste (nur auf Master)
+      shell: |
+        {{ hadoop_home }}/sbin/start-dfs.sh
+        {{ hadoop_home }}/sbin/start-yarn.sh
+      when: inventory_hostname == master_host
