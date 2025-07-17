@@ -17,6 +17,51 @@
           - rsync
         update_cache: yes
 
+    - name: Stelle sicher, dass ein ed25519 SSH-Key existiert
+      ansible.builtin.openssh_keypair:
+        path: /home/ubuntu/.ssh/id_ed25519
+        type: ed25519
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+      become_user: ubuntu
+
+    - name: Lese Public-Key ein und speichere als Hostvar
+      ansible.builtin.slurp:
+        src: /home/ubuntu/.ssh/id_ed25519.pub
+      register: pubkey_raw
+
+    - name: Setze Public-Key als Hostvar
+      set_fact:
+        my_pubkey: "{{ pubkey_raw.content | b64decode }}"
+
+    - name: Sammle alle Public-Keys auf dem Controller
+      run_once: true
+      delegate_to: localhost
+      set_fact:
+        all_pubkeys: "{{ query('inventory_hostnames', 'all') | map('extract', hostvars, 'my_pubkey') | list }}"
+
+    - name: Füge alle Public-Keys zu authorized_keys hinzu
+      ansible.builtin.lineinfile:
+        path: /home/ubuntu/.ssh/authorized_keys
+        line: "{{ item }}"
+        create: yes
+        state: present
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+      loop: "{{ all_pubkeys }}"
+      become_user: ubuntu
+
+    - name: Trage alle Cluster-IPs und Hostnamen in /etc/hosts ein
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ hostvars[item]['ansible_host'] }} {{ item }}"
+        state: present
+        create: yes
+      loop: "{{ groups['all'] }}"
+      become: yes
+
     - name: Lade Hadoop herunter
       get_url:
         url: "https://downloads.apache.org/hadoop/common/hadoop-{{ hadoop_version }}/hadoop-{{ hadoop_version }}.tar.gz"
@@ -62,6 +107,16 @@
         - /opt/hadoop_data/hdfs/namenode
         - /opt/hadoop_data/hdfs/datanode
 
+    - name: Setze JAVA_HOME in hadoop-env.sh
+      lineinfile:
+        path: "{{ hadoop_home }}/etc/hadoop/hadoop-env.sh"
+        regexp: '^export JAVA_HOME='
+        line: "export JAVA_HOME={{ java_home }}"
+        create: yes
+        mode: '0644'
+      become: yes
+      tags: java
+
     - name: Konfiguriere core-site.xml
       template:
         src: core-site.xml.j2
@@ -82,6 +137,17 @@
         src: yarn-site.xml.j2
         dest: "{{ hadoop_home }}/etc/hadoop/yarn-site.xml"
 
+    - name: Format NameNode (nur beim ersten Setup, nur auf Master)
+      shell: . /etc/profile.d/hadoop.sh && /opt/hadoop/bin/hdfs namenode -format -force
+      args:
+        creates: /opt/hadoop_data/hdfs/namenode/current
+        executable: /bin/bash
+      when: inventory_hostname == master_host
+      become: yes
+      become_user: ubuntu
+      environment:
+        HOME: /home/ubuntu
+
     - name: Schreibe Worker-Liste
       copy:
         dest: "{{ hadoop_home }}/etc/hadoop/workers"
@@ -90,13 +156,46 @@
           {% endfor %}
         mode: '0644'
 
-  handlers:
-    - name: Format HDFS (nur auf Master)
-      command: "{{ hadoop_home }}/bin/hdfs namenode -format -force"
+    - name: Starte DataNode auf Workern
+      shell: |
+        source /etc/profile.d/hadoop.sh
+        /opt/hadoop/sbin/hadoop-daemon.sh start datanode
+      args:
+        executable: /bin/bash
+      when: inventory_hostname in worker_hosts
+      become: yes
+      become_user: ubuntu
+      environment:
+        HOME: /home/ubuntu
+      ignore_errors: true
+
+    - name: Warten auf NameNode-Initialisierung
+      shell: sleep 3
       when: inventory_hostname == master_host
 
     - name: Starte Hadoop-Dienste (nur auf Master)
       shell: |
-        {{ hadoop_home }}/sbin/start-dfs.sh
-        {{ hadoop_home }}/sbin/start-yarn.sh
+        source /etc/profile.d/hadoop.sh
+        /opt/hadoop/sbin/start-dfs.sh
+        /opt/hadoop/sbin/start-yarn.sh
       when: inventory_hostname == master_host
+      become: yes
+      become_user: ubuntu
+      environment:
+        HOME: /home/ubuntu
+
+    - name: Neustart aller DataNodes (nur auf Workern)
+      shell: |
+        source /etc/profile.d/hadoop.sh
+        /opt/hadoop/sbin/hadoop-daemon.sh stop datanode
+        sleep 10
+        nohup /opt/hadoop/sbin/hadoop-daemon.sh start datanode > /opt/hadoop/logs/datanode_start.log 2>&1 &
+        sleep 5
+        jps | grep DataNode || (echo "DataNode nicht gestartet, versuche erneut..." && nohup /opt/hadoop/sbin/hadoop-daemon.sh start datanode > /opt/hadoop/logs/datanode_start.log 2>&1 &)
+      args:
+        executable: /bin/bash
+      when: inventory_hostname in worker_hosts
+      become: yes
+      become_user: ubuntu
+      environment:
+        HOME: /home/ubuntu
