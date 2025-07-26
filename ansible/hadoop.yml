@@ -5,17 +5,33 @@
   vars:
     hadoop_version: "3.3.6"
     hadoop_home: "/opt/hadoop"
-    java_home: "/usr/lib/jvm/java-11-openjdk-amd64"
+    java_home: "/usr/lib/jvm/java-17-openjdk-amd64"
     master_host: "{{ groups['master'][0] }}"
     worker_hosts: "{{ groups['worker'] }}"
   tasks:
     - name: Installiere benötigte Pakete
       apt:
         name:
-          - openjdk-11-jdk
+          - openjdk-17-jdk
           - ssh
           - rsync
+          - python3
+          - python3-pip
+          - python3-venv
+        state: present
         update_cache: yes
+
+    - name: Erstelle Python venv für pyspark
+      become: yes
+      become_user: ubuntu
+      shell: |
+        python3 -m venv /home/ubuntu/venv
+        /home/ubuntu/venv/bin/pip install --upgrade pip
+        /home/ubuntu/venv/bin/pip install pyspark
+      args:
+        creates: /home/ubuntu/venv/bin/activate
+        executable: /bin/bash
+      tags: pyspark
 
     - name: Stelle sicher, dass ein ed25519 SSH-Key existiert
       ansible.builtin.openssh_keypair:

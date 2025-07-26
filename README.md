@@ -42,5 +42,29 @@ TODO:
 
 - Task 4
 
-  - Install MinIO as Datalake on the Multi-Node Architecture
-  - Save a example Dataset using PySpark
+  - Install Hadoop HDFS as Datalake on the Multi-Node Architecture
+  - Save and edit a dummy Dataset using PySpark
+
+  - terraform init
+  - export OS_AUTH_URL="https://stack.dhbw.cloud:5000"
+    export OS_USERNAME="pfisterer-cloud-lecture"
+    export OS_PASSWORD="ss2025"
+    export OS_PROJECT_ID="6c1ae45e04f24dc695d6f526fce253c6"
+    export OS_USER_DOMAIN_NAME="default"
+  - terraform apply #creating the instances
+  - cd ansible
+  - ansible-playbook -i terraform_inventory.sh hadoop.yml #hadoop datalake implementation
+  - cd ../
+  - scp data/beispiel.csv ubuntu@{master-ip}:/tmp/beispiel.csv #copy dummy csv from local to the master instance
+  - ssh@ubuntu{master-ip}
+  - hdfs dfs -mkdir -p /user/ubuntu #create directory if not already there
+  - hdfs dfs -put /tmp/beispiel.csv /user/ubuntu/beispiel.csv #put the csv from tmp into the datalake
+  - Edit the data:
+    - source ~/venv/bin/activate #start venv
+    - pyspark #start pyspark environment
+    - df = spark.read.option("header", "true").csv("/user/ubuntu/beispiel.csv") #read csv from datalake
+    - from pyspark.sql.functions import col
+    - df2 = df.withColumn("new_column", col("id") * 2) #create new column which doubles the value of id column
+    - df2.write.mode("overwrite").option("header", "true").csv("/tmp/beispiel_tmp") #spark exports data in a directory with part-csv files
+    - exit() #leave pyspark environment
+    - cat /tmp/beispiel_tmp/part-*.csv > /user/ubuntu/beispiel.csv #fuse the temporary part-csv files into a csv file to write back into the lake
