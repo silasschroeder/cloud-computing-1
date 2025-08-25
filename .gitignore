@@ -1,0 +1,42 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+
+# Deployment info files (keep these to track versions)
+# deployment-*.info
+
+# Generated Kubernetes manifests (keep versioned ones)
+# k8s-entities-*.yaml
+
+# Temporary files
+*.tmp
+/tmp/
+
+# SSH keys and secrets
+*.pem
+*.key
+env.sh
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node modules (if any)
+node_modules/
+package-lock.json
+
+# Build artifacts
+dist/
+build/
