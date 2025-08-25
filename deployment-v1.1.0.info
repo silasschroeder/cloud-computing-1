@@ -1,0 +1,5 @@
+Infrastructure Version: v1.1.0
+Application Version: 1.1.0
+Master IP: 192.168.1.110
+Deployment Time: Sun Aug 24 23:23:06 EDT 2025
+K8s Manifest: k8s-entities-v1.1.0.yaml

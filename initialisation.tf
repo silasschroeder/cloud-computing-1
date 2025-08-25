@@ -59,10 +59,10 @@ resource "openstack_compute_instance_v2" "master" {
     command = "ssh-keygen -R ${self.network.0.fixed_ip_v4}" # Eliminates the problem of being unable to ssh to the VM
   }
 
-  tags = {
-    version = var.infrastructure_version
-    app_version = var.app_version
-  }
+  tags = [
+    "version:${var.infrastructure_version}",
+    "app_version:${var.app_version}"
+  ]
 }
 
 resource "openstack_compute_instance_v2" "worker_nodes" {
@@ -86,10 +86,10 @@ resource "openstack_compute_instance_v2" "worker_nodes" {
 
   depends_on = [openstack_compute_instance_v2.master] # Ensure master is created first
 
-  tags = {
-    version = var.infrastructure_version
-    app_version = var.app_version
-  }
+  tags = [
+    "version:${var.infrastructure_version}",
+    "app_version:${var.app_version}"
+  ]
 }
 
 # Generate the k8s manifest with current variables
