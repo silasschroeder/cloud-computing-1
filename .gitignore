@@ -11,6 +11,9 @@
 # Generated Kubernetes manifests (keep versioned ones)
 # k8s-entities-*.yaml
 
+# Demo output directory
+demo-output/
+
 # Temporary files
 *.tmp
 /tmp/
