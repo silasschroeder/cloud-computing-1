@@ -1,5 +1,5 @@
 variable "worker_count" {
-  default = 3
+  default = 2
 }
 
 # Define required providers

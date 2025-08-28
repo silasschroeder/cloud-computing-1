@@ -88,6 +88,21 @@ echo "✅ Switched to version $ROLLBACK_VERSION on branch $ROLLBACK_BRANCH"
 # Deploy the rollback version
 echo ""
 echo "🚀 Deploying version $ROLLBACK_VERSION..."
+
+# Check if app folder exists (required for ConfigMap generation)
+if [ ! -d "app" ]; then
+    echo "❌ Error: app/ folder not found in version $ROLLBACK_VERSION"
+    echo "This version may be incompatible with the current deployment system."
+    exit 1
+fi
+
+# Validate app structure
+if [ ! -f "app/package.json" ] || [ ! -f "app/server.js" ]; then
+    echo "❌ Error: Required app files (package.json, server.js) not found in app/"
+    echo "This version may be incompatible with the current deployment system."
+    exit 1
+fi
+
 terraform init
 terraform apply -auto-approve
 
@@ -95,6 +110,12 @@ terraform apply -auto-approve
 if [ -f "k8s-app.yaml" ]; then
     echo ""
     echo "📱 Deploying application..."
+    
+    # Verify k8s manifest contains app source
+    if ! grep -q "app-source-" k8s-app.yaml; then
+        echo "⚠️  Warning: k8s-app.yaml doesn't contain app source ConfigMap"
+        echo "This may be an older version format. Application deployment may fail."
+    fi
     
     # Get master IP from Terraform output
     MASTER_IP=$(grep -A 3 "mjcs2-k8s-master" terraform.tfstate | grep "access_ip_v4" | cut -d'"' -f4)
@@ -160,6 +181,7 @@ fi
 
 echo ""
 echo "📋 Useful commands:"
-echo "   Check status: ./version_status.sh"
 echo "   SSH to master: ssh ubuntu@$MASTER_IP"
+echo "   Check pods: ssh ubuntu@$MASTER_IP 'sudo kubectl get pods'"
+echo "   Check services: ssh ubuntu@$MASTER_IP 'sudo kubectl get services'"
 echo "   View Git log: git log --oneline"
