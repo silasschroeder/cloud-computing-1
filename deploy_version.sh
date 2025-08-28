@@ -281,13 +281,30 @@ terraform init
 terraform plan
 terraform apply -auto-approve
 
-# Get master IP from terraform output
-MASTER_IP=$(terraform show -json | jq -r '.values.root_module.resources[] | select(.type=="openstack_compute_instance_v2" and .name=="master") | .values.network[0].fixed_ip_v4' 2>/dev/null)
+# Get master IP manually from user
+echo ""
+echo "Infrastructure deployment completed!"
+echo ""
+echo "Please check your OpenStack dashboard or run 'terraform show' to find the master node IP."
+echo "Look for the master node (mjcs2-k8s-master) and note its fixed_ip_v4 address."
+echo ""
 
-if [ -z "$MASTER_IP" ] || [ "$MASTER_IP" == "null" ]; then
-    echo "Error: Could not retrieve master IP from terraform output"
-    exit 1
-fi
+while true; do
+    read -p "Enter the master node IP address: " MASTER_IP
+    
+    if [ -z "$MASTER_IP" ]; then
+        echo "Error: IP address cannot be empty. Please try again."
+        continue
+    fi
+    
+    # Basic IP validation (simple regex)
+    if [[ $MASTER_IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        echo "Using master IP: $MASTER_IP"
+        break
+    else
+        echo "Error: Invalid IP address format. Please enter a valid IP (e.g., 192.168.1.100)"
+    fi
+done
 
 echo ""
 echo "========================================="
