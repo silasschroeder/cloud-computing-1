@@ -66,9 +66,9 @@ spec:
             const pod = process.env.HOSTNAME || 'unknown-pod';
             const html = `<!DOCTYPE html>
             <html>
-            <head><title>Global Counter v5.1</title></head>
+            <head><title>Global Counter v5.3</title></head>
             <body style="font-family: Arial; text-align: center; margin: 50px;">
-                <h1 style="color: green;">🌍 Global Counter v5.1</h1>
+                <h1 style="color: green;">🌍 Global Counter v5.3</h1>
                 <h2 style="color: blue; font-size: 5em;">${counter}</h2>
                 <p><strong>🔢 Globale Aufrufe über ALLE Worker</strong></p>
                 <p><strong>🚀 Pod:</strong> ${pod}</p>
