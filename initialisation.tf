@@ -1,5 +1,5 @@
 variable "worker_count" {
-  default = 3
+  default = 2
 }
 
 # Define required providers
@@ -19,7 +19,7 @@ resource "openstack_compute_instance_v2" "master" {
   image_id        = "c57c2aef-f74a-4418-94ca-d3fb169162bf"
   flavor_name     = "mb1.small"
   security_groups = ["default"]
-  key_pair        = "silasschroeder"
+  key_pair        = "Jonas Public"
   user_data       = file("${path.module}/master.sh")
 
   network {
