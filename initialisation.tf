@@ -1,5 +1,5 @@
 variable "worker_count" {
-  default = 2
+  default = 3
 }
 
 # Define required providers
@@ -23,7 +23,7 @@ resource "openstack_compute_instance_v2" "master" {
   user_data       = file("${path.module}/master.sh")
 
   network {
-    name = "provider_912"
+    name = "DHBW"
   }
   provisioner "local-exec" {
     command = "ssh-keygen -R ${self.network.0.fixed_ip_v4}" # Eliminates the problem of being unable to ssh to the VM
@@ -36,13 +36,13 @@ resource "openstack_compute_instance_v2" "worker_nodes" {
   image_id        = "c57c2aef-f74a-4418-94ca-d3fb169162bf"
   flavor_name     = "mb1.small"
   security_groups = ["default"]
-  key_pair        = "silasschroeder"
+  key_pair        = "Jonas Public"
   user_data = templatefile("${path.module}/worker.sh", {
     master_ip = openstack_compute_instance_v2.master.network.0.fixed_ip_v4
   })
 
   network {
-    name = "provider_912"
+    name = "DHBW"
   }
 
   provisioner "local-exec" {
