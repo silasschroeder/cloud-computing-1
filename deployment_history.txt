@@ -1,6 +1,0 @@
-Wed Aug 27 22:44:34 EDT 2025: Deployed version 0.0.1
-Wed Aug 27 22:49:23 EDT 2025: Deployed version 0.0.2
-Wed Aug 27 23:01:54 EDT 2025: Deployed version 0.0.3
-Wed Aug 27 23:13:50 EDT 2025: Deployed version 0.0.5
-Wed Aug 27 23:19:01 EDT 2025: Deployed version 0.0.6
-Wed Aug 27 23:54:32 EDT 2025: Deployed version 1.0.0
