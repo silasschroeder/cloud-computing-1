@@ -162,10 +162,15 @@ echo "Deploying infrastructure..."
 terraform init
 terraform apply -auto-approve
 
-# Get master IP from user
+# Get master IP from Terraform output
 echo ""
-echo "Infrastructure deployed! Please find the master node IP."
-read -p "Enter master IP address: " MASTER_IP
+echo "Infrastructure deployed! Extracting master IP from Terraform state..."
+MASTER_IP=$(grep -A 3 "mjcs2-k8s-master" terraform.tfstate | grep "access_ip_v4" | cut -d'"' -f4)
+
+if [ -z "$MASTER_IP" ]; then
+    echo "Could not extract master IP from Terraform. Please enter manually:"
+    read -p "Enter master IP address: " MASTER_IP
+fi
 
 if [ -z "$MASTER_IP" ]; then
     echo "Error: IP address cannot be empty"
@@ -182,13 +187,15 @@ scp -o StrictHostKeyChecking=no k8s-app.yaml ubuntu@$MASTER_IP:~/
 
 ssh -o StrictHostKeyChecking=no ubuntu@$MASTER_IP << 'ENDSSH'
     # Wait for cloud-init
+    echo "⏳ Waiting for cloud-init to complete..."
     sudo cloud-init status --wait
     
     # Configure Kubernetes
-    echo "Setting up Kubernetes..."
+    echo "🚀 Setting up Kubernetes master..."
     sudo salt 'mjcs2-k8s-master' state.apply master_pre-worker-setup
     
     # Configure workers
+    echo "🔧 Configuring worker nodes..."
     MASTER_IP=$(cat ~/master_ip.txt)
     TOKEN=$(cat ~/master_token.txt)
     sudo sed -i "s/<master_ip>/$MASTER_IP/g" /srv/salt/worker_setup.sls
@@ -196,24 +203,37 @@ ssh -o StrictHostKeyChecking=no ubuntu@$MASTER_IP << 'ENDSSH'
     sudo salt 'mjcs2-k8s-worker*' state.apply worker_setup
     
     # Wait for cluster
-    echo "Waiting for cluster to be ready..."
+    echo "⏳ Waiting for cluster to be ready..."
     sleep 60
     
     # Update k8s manifest with actual master IP for NFS
-    echo "Configuring shared storage with Master IP..."
+    echo "📁 Configuring shared storage with Master IP..."
     sed -i "s/MASTER_IP_PLACEHOLDER/$MASTER_IP/g" k8s-app.yaml
     
+    # Verify cluster is ready
+    echo "🔍 Verifying cluster status..."
+    sudo kubectl get nodes
+    
     # Deploy app
-    echo "Deploying global counter application..."
+    echo "🚀 Deploying global counter application..."
     sudo kubectl apply -f k8s-app.yaml
     
-    echo "Deployment complete!"
-    sudo kubectl get pods
-    sudo kubectl get services
+    # Wait for deployment
+    echo "⏳ Waiting for pods to start..."
+    sleep 30
     
+    # Show final status
+    echo ""
+    echo "📊 Final deployment status:"
+    sudo kubectl get pods | grep simple-counter
+    sudo kubectl get services | grep simple-counter
+    
+    # Get service port for output
+    SERVICE_PORT=$(sudo kubectl get service simple-counter-service -o jsonpath='{.spec.ports[0].nodePort}')
     echo ""
     echo "🌍 Global Counter App deployed with shared NFS storage!"
     echo "📊 All worker pods share the same counter state"
+    echo "🔗 Application URL: http://$MASTER_IP:$SERVICE_PORT"
 ENDSSH
 
 echo ""
@@ -221,7 +241,45 @@ echo "========================================="
 echo "Deployment completed!"
 echo "========================================="
 echo "Git: Changes committed and tagged as v$VERSION"
-echo "Access: ssh ubuntu@$MASTER_IP"
-echo "Check: kubectl get pods"
+echo "Master IP: $MASTER_IP"
 echo ""
-echo "To return to this version: git checkout v$VERSION"
+
+# Wait for pods to be ready and get service port
+echo "🔍 Waiting for application to be ready..."
+sleep 30
+
+# Get the NodePort
+SERVICE_PORT=$(ssh -o StrictHostKeyChecking=no ubuntu@$MASTER_IP "sudo kubectl get service simple-counter-service -o jsonpath='{.spec.ports[0].nodePort}'" 2>/dev/null || echo "")
+
+if [ -n "$SERVICE_PORT" ]; then
+    echo "🌐 Application URL: http://$MASTER_IP:$SERVICE_PORT"
+    echo ""
+    
+    # Test the application
+    echo "🧪 Testing application..."
+    for i in {1..3}; do
+        COUNTER=$(curl -s http://$MASTER_IP:$SERVICE_PORT 2>/dev/null | grep -o '<h2[^>]*>[^<]*</h2>' | sed 's/<[^>]*>//g' 2>/dev/null || echo "N/A")
+        if [ "$COUNTER" != "N/A" ]; then
+            echo "✅ Test $i: Counter = $COUNTER"
+        else
+            echo "⏳ Test $i: Application still starting..."
+        fi
+        sleep 2
+    done
+    echo ""
+    echo "🎉 Global Counter App v$VERSION deployed successfully!"
+    echo "🔗 Access your app: http://$MASTER_IP:$SERVICE_PORT"
+else
+    echo "⚠️  Could not determine service port. Check manually with:"
+    echo "   ssh ubuntu@$MASTER_IP"
+    echo "   sudo kubectl get services"
+fi
+
+echo ""
+echo "📋 Useful commands:"
+echo "   SSH to master: ssh ubuntu@$MASTER_IP"
+echo "   Check pods: ssh ubuntu@$MASTER_IP 'sudo kubectl get pods'"
+echo "   Check services: ssh ubuntu@$MASTER_IP 'sudo kubectl get services'"
+echo "   View logs: ssh ubuntu@$MASTER_IP 'sudo kubectl logs <pod-name>'"
+echo ""
+echo "🔄 To return to this version: git checkout v$VERSION"
