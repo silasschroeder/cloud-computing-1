@@ -13,7 +13,7 @@ spec:
     - ReadWriteMany
   nfs:
     path: /mnt/data
-    server: <master-ip> # REPLACE WITH ACTUAL IP
+    server: 141.72.12.68 # REPLACE WITH ACTUAL IP
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
