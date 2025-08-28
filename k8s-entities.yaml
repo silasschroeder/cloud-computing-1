@@ -32,7 +32,7 @@ kind: Deployment
 metadata:
   name: stateful-app
   labels:
-    version: 0.0.5
+    version: 0.0.6
 spec:
   replicas: 3
   selector:
@@ -42,7 +42,7 @@ spec:
     metadata:
       labels:
         app: stateful-app
-        version: 0.0.5
+        version: 0.0.6
     spec:
       containers:
         - name: stateful-container
@@ -61,7 +61,7 @@ spec:
               memory: "256Mi"
           env:
             - name: APP_VERSION
-              value: "0.0.5"
+              value: "0.0.6"
       volumes:
         - name: app-data
           persistentVolumeClaim:
@@ -72,7 +72,7 @@ kind: Service
 metadata:
   name: stateful-app-service
   labels:
-    version: 0.0.5
+    version: 0.0.6
 spec:
   selector:
     app: stateful-app
@@ -87,7 +87,7 @@ kind: Ingress
 metadata:
   name: stateful-app-ingress
   labels:
-    version: 0.0.5
+    version: 0.0.6
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
@@ -108,7 +108,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: stateful-app
   labels:
-    version: 0.0.5
+    version: 0.0.6
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
