@@ -15,18 +15,6 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
-# Simple Git workflow
-BRANCH_NAME="deploy-v$VERSION"
-echo "Creating Git branch: $BRANCH_NAME"
-
-# Create and switch to new branch
-if git show-ref --verify --quiet refs/heads/$BRANCH_NAME; then
-    echo "Branch $BRANCH_NAME already exists, switching to it..."
-    git checkout $BRANCH_NAME
-else
-    git checkout -b $BRANCH_NAME
-fi
-
 # Create simple Kubernetes manifest
 echo "Creating Kubernetes manifest for version $VERSION..."
 cat > k8s-app.yaml << EOF
@@ -95,17 +83,6 @@ spec:
   type: NodePort
 EOF
 
-# Git commit the changes
-echo "Committing changes to Git..."
-git add .
-git commit -m "Deploy version $VERSION - Simple counter app with $VERSION"
-
-# Create Git tag
-echo "Creating Git tag v$VERSION..."
-git tag -a "v$VERSION" -m "Release version $VERSION"
-
-echo "Git: Branch $BRANCH_NAME created and tagged as v$VERSION"
-
 # Deploy infrastructure
 echo "Deploying infrastructure..."
 terraform init
@@ -161,8 +138,5 @@ echo ""
 echo "========================================="
 echo "Deployment completed!"
 echo "========================================="
-echo "Git: Changes committed and tagged as v$VERSION"
 echo "Access: ssh ubuntu@$MASTER_IP"
 echo "Check: kubectl get pods"
-echo ""
-echo "To return to this version: git checkout v$VERSION"
