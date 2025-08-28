@@ -1,0 +1,15 @@
+{
+  "name": "global-counter-app",
+  "version": "1.0.0",
+  "description": "Global counter application for Kubernetes deployment",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "author": "Cloud Computing Course",
+  "license": "MIT"
+}

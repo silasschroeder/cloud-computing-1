@@ -34,6 +34,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: simple-counter-app
+  labels:
+    app: simple-counter-app
+    version: $VERSION
 spec:
   replicas: 3
   selector:
@@ -43,6 +46,7 @@ spec:
     metadata:
       labels:
         app: simple-counter-app
+        version: $VERSION
     spec:
       containers:
       - name: simple-counter-app
@@ -52,82 +56,58 @@ spec:
         env:
         - name: DATA_DIR
           value: "/shared-data"
+        - name: APP_VERSION
+          value: "$VERSION"
+        - name: PORT
+          value: "3000"
         volumeMounts:
         - name: shared-counter-storage
           mountPath: /shared-data
+        - name: app-code
+          mountPath: /app-source
+        workingDir: /app
         command: ["sh", "-c"]
         args:
         - |
-          cd /tmp && npm init -y && npm install express --save
-          cat > app.js << 'APPEOF'
-          const express = require('express');
-          const fs = require('fs');
-          const path = require('path');
-          const app = express();
+          # Copy application files to working directory
+          cp -r /app-source/* /app/
           
-          const dataDir = process.env.DATA_DIR || '/shared-data';
-          const counterFile = path.join(dataDir, 'global-counter.txt');
+          # Install dependencies
+          npm install
           
-          if (!fs.existsSync(dataDir)) {
-            fs.mkdirSync(dataDir, { recursive: true });
-          }
-          
-          function readCounter() {
-            try {
-              if (fs.existsSync(counterFile)) {
-                return parseInt(fs.readFileSync(counterFile, 'utf8')) || 0;
-              }
-              return 0;
-            } catch (err) {
-              return 0;
-            }
-          }
-          
-          function writeCounter(count) {
-            try {
-              fs.writeFileSync(counterFile, count.toString());
-            } catch (err) {
-              console.error('Error writing counter:', err);
-            }
-          }
-          
-          app.get('/', (req, res) => {
-            const counter = readCounter() + 1;
-            writeCounter(counter);
-            
-            const pod = process.env.HOSTNAME || 'unknown-pod';
-            const html = \`<!DOCTYPE html>
-            <html>
-            <head><title>Global Counter v${VERSION}</title></head>
-            <body style="font-family: Arial; text-align: center; margin: 50px;">
-                <h1 style="color: green;">🌍 Global Counter v${VERSION}</h1>
-                <h2 style="color: blue; font-size: 5em;">\${counter}</h2>
-                <p><strong>🔢 Globale Aufrufe über ALLE Worker</strong></p>
-                <p><strong>🚀 Pod:</strong> \${pod}</p>
-                <p><em>⏰ Zeit:</em> \${new Date().toLocaleString('de-DE')}</p>
-                <button onclick="location.reload()" style="padding: 15px 30px; font-size: 18px; margin: 10px; background: blue; color: white; border: none; cursor: pointer;">
-                    🔄 Counter erhöhen
-                </button>
-                <a href="/reset" style="display: inline-block; padding: 15px 30px; font-size: 18px; margin: 10px; background: red; color: white; text-decoration: none;">
-                    🗑️ Reset
-                </a>
-            </body>
-            </html>\`;
-            res.send(html);
-          });
-          
-          app.get('/reset', (req, res) => {
-            writeCounter(0);
-            res.redirect('/');
-          });
-          
-          app.listen(3000, '0.0.0.0', () => {
-            console.log('🚀 Global Counter App started on port 3000');
-            console.log('📊 Current counter:', readCounter());
-          });
-          APPEOF
-          node app.js
+          # Start application
+          npm start
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
       volumes:
+      - name: shared-counter-storage
+        nfs:
+          server: MASTER_IP_PLACEHOLDER
+          path: /mnt/data
+      - name: app-code
+        configMap:
+          name: app-source-$VERSION
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-source-$VERSION
+data:
+  package.json: |
+$(cat app/package.json | sed 's/^/    /')
+  server.js: |
+$(cat app/server.js | sed 's/^/    /')
+---
       - name: shared-counter-storage
         nfs:
           server: MASTER_IP_PLACEHOLDER

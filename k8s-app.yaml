@@ -2,6 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: simple-counter-app
+  labels:
+    app: simple-counter-app
+    version: 5.6
 spec:
   replicas: 3
   selector:
@@ -11,6 +14,7 @@ spec:
     metadata:
       labels:
         app: simple-counter-app
+        version: 5.6
     spec:
       containers:
       - name: simple-counter-app
@@ -20,82 +24,296 @@ spec:
         env:
         - name: DATA_DIR
           value: "/shared-data"
+        - name: APP_VERSION
+          value: "5.6"
+        - name: PORT
+          value: "3000"
         volumeMounts:
         - name: shared-counter-storage
           mountPath: /shared-data
+        - name: app-code
+          mountPath: /app-source
+        workingDir: /app
         command: ["sh", "-c"]
         args:
         - |
-          cd /tmp && npm init -y && npm install express --save
-          cat > app.js << 'APPEOF'
-          const express = require('express');
-          const fs = require('fs');
-          const path = require('path');
-          const app = express();
+          # Copy application files to working directory
+          cp -r /app-source/* /app/
           
-          const dataDir = process.env.DATA_DIR || '/shared-data';
-          const counterFile = path.join(dataDir, 'global-counter.txt');
+          # Install dependencies
+          npm install
           
-          if (!fs.existsSync(dataDir)) {
-            fs.mkdirSync(dataDir, { recursive: true });
-          }
-          
-          function readCounter() {
-            try {
-              if (fs.existsSync(counterFile)) {
-                return parseInt(fs.readFileSync(counterFile, 'utf8')) || 0;
-              }
-              return 0;
-            } catch (err) {
-              return 0;
-            }
-          }
-          
-          function writeCounter(count) {
-            try {
-              fs.writeFileSync(counterFile, count.toString());
-            } catch (err) {
-              console.error('Error writing counter:', err);
-            }
-          }
-          
-          app.get('/', (req, res) => {
-            const counter = readCounter() + 1;
-            writeCounter(counter);
-            
-            const pod = process.env.HOSTNAME || 'unknown-pod';
-            const html = `<!DOCTYPE html>
-            <html>
-            <head><title>Global Counter v5.3</title></head>
-            <body style="font-family: Arial; text-align: center; margin: 50px;">
-                <h1 style="color: green;">🌍 Global Counter v5.3</h1>
-                <h2 style="color: blue; font-size: 5em;">${counter}</h2>
-                <p><strong>🔢 Globale Aufrufe über ALLE Worker</strong></p>
-                <p><strong>🚀 Pod:</strong> ${pod}</p>
-                <p><em>⏰ Zeit:</em> ${new Date().toLocaleString('de-DE')}</p>
-                <button onclick="location.reload()" style="padding: 15px 30px; font-size: 18px; margin: 10px; background: blue; color: white; border: none; cursor: pointer;">
-                    🔄 Counter erhöhen
-                </button>
-                <a href="/reset" style="display: inline-block; padding: 15px 30px; font-size: 18px; margin: 10px; background: red; color: white; text-decoration: none;">
-                    🗑️ Reset
-                </a>
-            </body>
-            </html>`;
-            res.send(html);
-          });
-          
-          app.get('/reset', (req, res) => {
-            writeCounter(0);
-            res.redirect('/');
-          });
-          
-          app.listen(3000, '0.0.0.0', () => {
-            console.log('🚀 Global Counter App started on port 3000');
-            console.log('📊 Current counter:', readCounter());
-          });
-          APPEOF
-          node app.js
+          # Start application
+          npm start
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
       volumes:
+      - name: shared-counter-storage
+        nfs:
+          server: MASTER_IP_PLACEHOLDER
+          path: /mnt/data
+      - name: app-code
+        configMap:
+          name: app-source-5.6
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-source-5.6
+data:
+  package.json: |
+    {
+      "name": "global-counter-app",
+      "version": "1.0.0",
+      "description": "Global counter application for Kubernetes deployment",
+      "main": "server.js",
+      "scripts": {
+        "start": "node server.js",
+        "dev": "node server.js"
+      },
+      "dependencies": {
+        "express": "^4.18.2"
+      },
+      "author": "Cloud Computing Course",
+      "license": "MIT"
+    }
+  server.js: |
+    const express = require('express');
+    const fs = require('fs');
+    const path = require('path');
+    const app = express();
+    
+    // Configuration
+    const PORT = process.env.PORT || 3000;
+    const DATA_DIR = process.env.DATA_DIR || '/shared-data';
+    const APP_VERSION = process.env.APP_VERSION || '1.0.0';
+    
+    // Counter file path
+    const counterFile = path.join(DATA_DIR, 'global-counter.txt');
+    
+    // Ensure data directory exists
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    
+    /**
+     * Read current counter value from file
+     */
+    function readCounter() {
+      try {
+        if (fs.existsSync(counterFile)) {
+          return parseInt(fs.readFileSync(counterFile, 'utf8')) || 0;
+        }
+        return 0;
+      } catch (err) {
+        console.error('Error reading counter:', err);
+        return 0;
+      }
+    }
+    
+    /**
+     * Write counter value to file
+     */
+    function writeCounter(count) {
+      try {
+        fs.writeFileSync(counterFile, count.toString());
+      } catch (err) {
+        console.error('Error writing counter:', err);
+      }
+    }
+    
+    /**
+     * Main route - increment counter and show page
+     */
+    app.get('/', (req, res) => {
+      const counter = readCounter() + 1;
+      writeCounter(counter);
+      
+      const pod = process.env.HOSTNAME || 'unknown-pod';
+      const timestamp = new Date().toLocaleString('de-DE');
+      
+      const html = `<!DOCTYPE html>
+    <html lang="de">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Global Counter v${APP_VERSION}</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                text-align: center;
+                margin: 0;
+                padding: 50px;
+                min-height: 100vh;
+                box-sizing: border-box;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: rgba(255, 255, 255, 0.1);
+                padding: 40px;
+                border-radius: 20px;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            }
+            h1 {
+                color: #FFD700;
+                margin-bottom: 20px;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            }
+            .counter {
+                font-size: 6em;
+                font-weight: bold;
+                color: #00FF7F;
+                margin: 30px 0;
+                text-shadow: 3px 3px 6px rgba(0,0,0,0.7);
+            }
+            .info {
+                background: rgba(0, 0, 0, 0.3);
+                padding: 20px;
+                border-radius: 10px;
+                margin: 20px 0;
+                text-align: left;
+            }
+            .info-item {
+                margin: 10px 0;
+                padding: 8px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 5px;
+            }
+            .button {
+                display: inline-block;
+                padding: 15px 30px;
+                font-size: 18px;
+                margin: 10px;
+                border: none;
+                border-radius: 25px;
+                cursor: pointer;
+                text-decoration: none;
+                transition: all 0.3s;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            }
+            .btn-primary {
+                background: #4CAF50;
+                color: white;
+            }
+            .btn-primary:hover {
+                background: #45a049;
+                transform: translateY(-2px);
+            }
+            .btn-danger {
+                background: #f44336;
+                color: white;
+            }
+            .btn-danger:hover {
+                background: #da190b;
+                transform: translateY(-2px);
+            }
+            .timestamp {
+                font-size: 0.9em;
+                opacity: 0.8;
+                margin-top: 30px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🌍 Global Counter v${APP_VERSION}</h1>
+            
+            <div class="counter">${counter}</div>
+            <p><strong>🔢 Globale Aufrufe über ALLE Worker Pods</strong></p>
+            
+            <div class="info">
+                <h3>📍 Container Informationen:</h3>
+                <div class="info-item"><strong>🚀 Pod:</strong> ${pod}</div>
+                <div class="info-item"><strong>📦 Version:</strong> ${APP_VERSION}</div>
+                <div class="info-item"><strong>💾 Speicherort:</strong> ${DATA_DIR}</div>
+                <div class="info-item"><strong>📊 Counter-Datei:</strong> ${counterFile}</div>
+            </div>
+            
+            <button class="button btn-primary" onclick="location.reload()">
+                🔄 Counter erhöhen
+            </button>
+            <a href="/reset" class="button btn-danger">
+                🗑️ Reset Counter
+            </a>
+            
+            <div class="timestamp">
+                ⏰ Letzter Aufruf: ${timestamp}
+            </div>
+        </div>
+    </body>
+    </html>`;
+      
+      res.send(html);
+    });
+    
+    /**
+     * Reset counter to 0
+     */
+    app.get('/reset', (req, res) => {
+      writeCounter(0);
+      console.log('Counter reset to 0');
+      res.redirect('/');
+    });
+    
+    /**
+     * API endpoint for counter value
+     */
+    app.get('/api/counter', (req, res) => {
+      res.json({
+        counter: readCounter(),
+        pod: process.env.HOSTNAME || 'unknown-pod',
+        version: APP_VERSION,
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    /**
+     * Health check endpoint
+     */
+    app.get('/health', (req, res) => {
+      res.json({
+        status: 'healthy',
+        counter: readCounter(),
+        pod: process.env.HOSTNAME || 'unknown-pod',
+        version: APP_VERSION,
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    // Start server
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Global Counter App v${APP_VERSION} started on port ${PORT}`);
+      console.log(`📍 Pod: ${process.env.HOSTNAME || 'unknown-pod'}`);
+      console.log(`💾 Data directory: ${DATA_DIR}`);
+      console.log(`📊 Current counter: ${readCounter()}`);
+    });
+    
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received, shutting down gracefully');
+      process.exit(0);
+    });
+    
+    process.on('SIGINT', () => {
+      console.log('SIGINT received, shutting down gracefully');
+      process.exit(0);
+    });
+---
       - name: shared-counter-storage
         nfs:
           server: MASTER_IP_PLACEHOLDER
