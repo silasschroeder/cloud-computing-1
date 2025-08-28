@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-counter-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: simple-counter-app
+  template:
+    metadata:
+      labels:
+        app: simple-counter-app
+    spec:
+      containers:
+      - name: simple-counter-app
+        image: node:18-alpine
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DATA_DIR
+          value: "/data"
+        volumeMounts:
+        - name: counter-storage
+          mountPath: /data
+        command: ["sh", "-c"]
+        args:
+        - |
+          npm install express
+          node -e "
+          const express = require('express');
+          const fs = require('fs');
+          const path = require('path');
+          const app = express();
+          
+          const dataDir = process.env.DATA_DIR || './data';
+          const counterFile = path.join(dataDir, 'counter.txt');
+          
+          // Ensure data directory exists
+          if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+          }
+          
+          // Read counter from file or initialize
+          let counter = 0;
+          try {
+            if (fs.existsSync(counterFile)) {
+              counter = parseInt(fs.readFileSync(counterFile, 'utf8')) || 0;
+            }
+          } catch (err) {
+            console.log('Initializing counter to 0');
+          }
+          
+          function saveCounter() {
+            try {
+              fs.writeFileSync(counterFile, counter.toString());
+            } catch (err) {
+              console.error('Error saving counter:', err);
+            }
+          }
+          
+          app.get('/', (req, res) => {
+            counter++;
+            saveCounter();
+            
+            const pod = process.env.HOSTNAME || 'unknown-pod';
+            const html = \`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Persistent Counter App v1.3</title>
+                <meta charset='utf-8'>
+            </head>
+            <body style='font-family: Arial; text-align: center; margin: 50px;'>
+                <h1>Persistent Counter App v1.3</h1>
+                <h2 style='color: blue; font-size: 4em;'>\${counter}</h2>
+                <p><strong>Gesamte Aufrufe (persistent)</strong></p>
+                <p>Pod: \${pod}</p>
+                <p>Aktualisiert: \${new Date().toLocaleString('de-DE')}</p>
+                <div style='margin-top: 30px;'>
+                  <button onclick='location.reload()' style='padding: 10px 20px; font-size: 16px; margin: 5px;'>
+                    Seite neu laden (Counter erhöht sich)
+                  </button>
+                  <a href='/reset' style='display: inline-block; padding: 10px 20px; font-size: 16px; margin: 5px; background: red; color: white; text-decoration: none;'>
+                    Counter zurücksetzen
+                  </a>
+                  <a href='/stats' style='display: inline-block; padding: 10px 20px; font-size: 16px; margin: 5px; background: green; color: white; text-decoration: none;'>
+                    Statistiken
+                  </a>
+                </div>
+            </body>
+            </html>
+            \`;
+            res.send(html);
+          });
+          
+          app.get('/reset', (req, res) => {
+            counter = 0;
+            saveCounter();
+            res.redirect('/');
+          });
+          
+          app.get('/stats', (req, res) => {
+            const pod = process.env.HOSTNAME || 'unknown-pod';
+            const stats = {
+              counter: counter,
+              pod: pod,
+              timestamp: new Date().toISOString(),
+              dataFile: counterFile
+            };
+            res.json(stats);
+          });
+          
+          app.listen(3000, '0.0.0.0', () => {
+            console.log(\`App running on port 3000, counter at: \${counter}\`);
+          });
+          "
+      volumes:
+      - name: counter-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: simple-counter-service
+spec:
+  selector:
+    app: simple-counter-app
+  ports:
+  - port: 80
+    targetPort: 3000
+  type: NodePort

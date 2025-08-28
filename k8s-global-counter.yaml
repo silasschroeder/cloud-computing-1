@@ -1,35 +1,3 @@
-#!/bin/bash
-
-# Load OpenStack environment
-export OS_AUTH_URL="https://stack.dhbw.cloud:5000"
-export OS_USERNAME="pfisterer-cloud-lecture"
-export OS_PASSWORD="ss2025"
-export OS_PROJECT_ID="6c1ae45e04f24dc695d6f526fce253c6"
-export OS_USER_DOMAIN_NAME="default"
-
-# Get version number
-read -p "Enter version number: " VERSION
-
-if [ -z "$VERSION" ]; then
-    echo "Error: Version number cannot be empty"
-    exit 1
-fi
-
-# Simple Git workflow
-BRANCH_NAME="deploy-v$VERSION"
-echo "Creating Git branch: $BRANCH_NAME"
-
-# Create and switch to new branch
-if git show-ref --verify --quiet refs/heads/$BRANCH_NAME; then
-    echo "Branch $BRANCH_NAME already exists, switching to it..."
-    git checkout $BRANCH_NAME
-else
-    git checkout -b $BRANCH_NAME
-fi
-
-# Create simple Kubernetes manifest
-echo "Creating Kubernetes manifest for version $VERSION..."
-cat > k8s-app.yaml << EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -155,11 +123,11 @@ spec:
             const html = \`<!DOCTYPE html>
             <html>
             <head>
-                <title>Global Counter App v${VERSION}</title>
+                <title>Global Counter App v1.4-global</title>
                 <meta charset='utf-8'>
             </head>
             <body style='font-family: Arial; text-align: center; margin: 50px;'>
-                <h1 style='color: green;'>🌍 Global Counter App v${VERSION}</h1>
+                <h1 style='color: green;'>🌍 Global Counter App v1.4</h1>
                 <h2 style='color: blue; font-size: 5em;'>\${globalCounter}</h2>
                 <p><strong>🔢 Globale Aufrufe über ALLE Worker</strong></p>
                 <p><strong>🚀 Aktueller Pod:</strong> \${pod}</p>
@@ -176,7 +144,7 @@ spec:
                   </a>
                 </div>
                 <div style='margin-top: 30px; font-size: 14px; color: #666; border: 1px solid #ddd; padding: 20px; border-radius: 10px;'>
-                  <h3>🔥 Features:</h3>
+                  <h3>�� Features:</h3>
                   <p>💾 <strong>Shared Storage:</strong> Counter wird in /shared-data/global-counter.txt gespeichert</p>
                   <p>🔒 <strong>Thread-Safe:</strong> Verwendet Locks für gleichzeitige Zugriffe</p>
                   <p>🌍 <strong>Global:</strong> Ein Counter für alle \${3} Worker-Pods</p>
@@ -213,13 +181,13 @@ spec:
             console.log('🚀 Global Counter App started on port 3000');
             console.log('🌍 Shared counter at startup:', initialCount);
             console.log('💾 Data stored in:', counterFile);
-            console.log('🔒 Lock file:', lockFilePath);
+            console.log('�� Lock file:', lockFilePath);
           });
           "
       volumes:
       - name: shared-counter-storage
         nfs:
-          server: MASTER_IP_PLACEHOLDER
+          server: 141.72.13.55
           path: /mnt/data
 ---
 apiVersion: v1
@@ -233,84 +201,3 @@ spec:
   - port: 80
     targetPort: 3000
   type: NodePort
-EOF
-
-# Git commit the changes
-echo "Committing changes to Git..."
-git add .
-git commit -m "Deploy version $VERSION - Simple counter app with $VERSION"
-
-# Create Git tag
-echo "Creating Git tag v$VERSION..."
-git tag -a "v$VERSION" -m "Release version $VERSION"
-
-echo "Git: Branch $BRANCH_NAME created and tagged as v$VERSION"
-
-# Deploy infrastructure
-echo "Deploying infrastructure..."
-terraform init
-terraform apply -auto-approve
-
-# Get master IP from user
-echo ""
-echo "Infrastructure deployed! Please find the master node IP."
-read -p "Enter master IP address: " MASTER_IP
-
-if [ -z "$MASTER_IP" ]; then
-    echo "Error: IP address cannot be empty"
-    exit 1
-fi
-
-echo "Master IP: $MASTER_IP"
-echo "Waiting for infrastructure to be ready..."
-sleep 120
-
-# Copy app manifest and deploy
-echo "Deploying application..."
-scp -o StrictHostKeyChecking=no k8s-app.yaml ubuntu@$MASTER_IP:~/
-
-ssh -o StrictHostKeyChecking=no ubuntu@$MASTER_IP << 'ENDSSH'
-    # Wait for cloud-init
-    sudo cloud-init status --wait
-    
-    # Configure Kubernetes
-    echo "Setting up Kubernetes..."
-    sudo salt 'mjcs2-k8s-master' state.apply master_pre-worker-setup
-    
-    # Configure workers
-    MASTER_IP=$(cat ~/master_ip.txt)
-    TOKEN=$(cat ~/master_token.txt)
-    sudo sed -i "s/<master_ip>/$MASTER_IP/g" /srv/salt/worker_setup.sls
-    sudo sed -i "s/<k8s_token>/$TOKEN/g" /srv/salt/worker_setup.sls
-    sudo salt 'mjcs2-k8s-worker*' state.apply worker_setup
-    
-    # Wait for cluster
-    echo "Waiting for cluster to be ready..."
-    sleep 60
-    
-    # Update k8s manifest with actual master IP for NFS
-    echo "Configuring shared storage with Master IP..."
-    sed -i "s/MASTER_IP_PLACEHOLDER/$MASTER_IP/g" k8s-app.yaml
-    
-    # Deploy app
-    echo "Deploying global counter application..."
-    sudo kubectl apply -f k8s-app.yaml
-    
-    echo "Deployment complete!"
-    sudo kubectl get pods
-    sudo kubectl get services
-    
-    echo ""
-    echo "🌍 Global Counter App deployed with shared NFS storage!"
-    echo "📊 All worker pods share the same counter state"
-ENDSSH
-
-echo ""
-echo "========================================="
-echo "Deployment completed!"
-echo "========================================="
-echo "Git: Changes committed and tagged as v$VERSION"
-echo "Access: ssh ubuntu@$MASTER_IP"
-echo "Check: kubectl get pods"
-echo ""
-echo "To return to this version: git checkout v$VERSION"

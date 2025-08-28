@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-counter-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: simple-counter-app
+  template:
+    metadata:
+      labels:
+        app: simple-counter-app
+    spec:
+      containers:
+      - name: simple-counter-app
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        command: ["sh", "-c"]
+        args:
+        - |
+          cat > /usr/share/nginx/html/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Simple Counter App v1.2</title>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="1">
+          </head>
+          <body style="font-family: Arial; text-align: center; margin: 50px;">
+              <h1>Simple Counter App v1.2</h1>
+              <h2 style="color: blue; font-size: 3em;" id="counter">Loading...</h2>
+              <p>Aufrufe seit Start</p>
+              <p><strong>Pod:</strong> <span id="pod"></span></p>
+              <p><em>Aktualisiert: <span id="time"></span></em></p>
+              <button onclick="location.reload()">Aktualisieren</button>
+              
+              <script>
+              let counter = Math.floor(Math.random() * 100) + 1;
+              setInterval(() => {
+                  counter++;
+                  document.getElementById('counter').textContent = counter;
+                  document.getElementById('pod').textContent = window.location.hostname || 'unknown-pod';
+                  document.getElementById('time').textContent = new Date().toLocaleString('de-DE');
+              }, 1000);
+              </script>
+          </body>
+          </html>
+          HTMLEOF
+          nginx -g 'daemon off;'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: simple-counter-service
+spec:
+  selector:
+    app: simple-counter-app
+  ports:
+  - port: 80
+    targetPort: 80
+  type: NodePort
