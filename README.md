@@ -39,3 +39,9 @@ TODO:
 - Task 3
 
   - Install kubernetes
+
+---
+
+# Cloud Computing and Big Data
+
+This repository is part of the portfolio assessment for the **Cloud Computing and Big Data** module. It outlines the objectives and documents the commands used by the group `mjcs2` to achieve these objectives. The group members are Maya Seifert (`8252799`), Jonas Giessler (`TODO`), Christian Fischer (`3105350`), Sarah Wonke (`8926805`), and Silas Schröder (`1653329`).

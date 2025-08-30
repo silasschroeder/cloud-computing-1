@@ -1,0 +1,11 @@
+auth:
+  rootUser: minioadmin
+  rootPassword: minioadminpassword
+defaultBuckets: "breastcancer-data;models"
+
+service:
+  type: NodePort
+  ports:
+    api: 9000
+  nodePorts:
+    api: 32001
