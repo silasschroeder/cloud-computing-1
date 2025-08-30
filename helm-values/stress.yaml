@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-stress-producer
+spec:
+  backoffLimit: 0 # NO RETRIES AFTER FAILURE
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: producer
+          image: silasschroeder/demo-keda:0.1
+          imagePullPolicy: Always

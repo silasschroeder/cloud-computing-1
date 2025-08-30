@@ -1,0 +1,16 @@
+worker:
+  replicas: 2
+  image:
+    repository: "silasschroeder/batch-processing"
+    tag: "0.2"
+    pullPolicy: Always
+
+scheduler:
+  image:
+    repository: "silasschroeder/batch-processing"
+    tag: "0.2"
+    pullPolicy: Always
+  serviceType: ClusterIP
+
+jupyter:
+  enabled: false

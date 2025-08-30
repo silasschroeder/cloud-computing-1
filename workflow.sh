@@ -1,5 +1,6 @@
+env.sh
 tofu init
-tofu apply # type "yes" to confirm
+tofu apply -auto-approve
 
 # wait 3-5 min
 
@@ -41,7 +42,7 @@ sudo kubectl apply -f k8s-entities.yaml
 
 # install prometheus
 sudo salt 'mjcs2-k8s-master' state.apply master_post-worker-setup # wait for pods to run
-sudo kubectl port-forward svc/prometheus-server 8888:80
+sudo kubectl port-forward --address 0.0.0.0 svc/prometheus-server 8888:80
 
 #start new terminal
 ssh -L 8888:localhost:8888 ubuntu@<master_ip>
@@ -52,7 +53,7 @@ ssh -L 8888:localhost:8888 ubuntu@<master_ip>
 # ---- PROMETHEUS WORKS ----
 
 # check horizontal scalability
-sudo kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.0001; do wget -q -O- http://<master_ip>; done" # INSERT IP
+sudo kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.0001; do wget -q -O- http://${MASTER_IP}; done"
 
 #open new terminal
 ssh ubuntu@<master_ip>
@@ -61,3 +62,4 @@ watch sudo kubectl get hpa # check stress level
 watch sudo kubectl get pods # check pod count 
 # 4th pod should be created after a while
 # press "Enter" within prometheus behind the added query to update the graph (3 -> 4)
+

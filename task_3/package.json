@@ -1,0 +1,12 @@
+{
+  "name": "simple-stateful-app",
+  "version": "1.0.0",
+  "description": "A simple Node.js app that counts accesses and stores them locally.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

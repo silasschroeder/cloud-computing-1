@@ -1,0 +1,14 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: breastcancer-train
+spec:
+  template:
+    spec:
+      containers:
+        - name: trainer
+          image: silasschroeder/batch-processing:0.2
+          imagePullPolicy: Always
+          command: ["python", "app.py"]
+      restartPolicy: Never
+  backoffLimit: 1
