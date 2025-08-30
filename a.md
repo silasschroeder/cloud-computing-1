@@ -30,9 +30,9 @@ When located in the project directory, the corresponding folder for Task 1 must 
 - `depends_on`: Variable in the worker nodes ensuring that the master already exists before the workers join the application cluster. More on this in Task # **TODO**.
 - `user_data`: References `.sh` files that are executed on the instance upon startup. This becomes relevant in Task 2.
 - `key_pair`: Must be set to a personal key pair for both the master and the worker nodes to enable SSH access to the machines.
-- `provisioner "local-exec"`: When establishing an SSH connection to an instance, the following issue may occasionally appear: ![identification-problem](https://raw.githubusercontent.com/silasschroeder/files/main/images/identification-problem.png). This block addresses the problem.
+- `provisioner "local-exec"`: When establishing an SSH connection to an instance with an IP address, which already occures within the users `known_hosts`, the following issue will appear: ![identification-problem](https://raw.githubusercontent.com/silasschroeder/files/main/images/identification-problem.png)This block addresses the problem.
 
-All other configurations only determine the name, resources, and key of the instances. Execution is carried out using the following commands:
+All other configurations determine the name, resources, and key of the instances. Execution is carried out using the following commands:
 
 ```sh
 cd task_1
@@ -44,13 +44,13 @@ tofu apply -auto-approve
 After approximately three minutes, all instances are active. If `key_pair` or `user_data` in `initialisation.tf` is deleted or modified, the immutability of the instances can be demonstrated by running `tofu plan`. The output will be:
 
 ```
-Plan: 2 to add, 0 to change, 2 to destroy.
+Plan: X to add, 0 to change, X to destroy.
 ```
 
 This shows that the instances must be rebuilt during an update. However, the output of `tofu plan` when changing `image_id` or `flavor_name` looks like this:
 
 ```
-Plan: 0 to add, 2 to change, 0 to destroy.
+Plan: 0 to add, X to change, 0 to destroy.
 ```
 
 This behavior is due to the OpenStack API, which supports resize and rebuild operations. These operations contradict the principle of immutability. Restarting an instance when changing the mentioned attributes can be enforced using the `lifecycle { replace_triggered_by=[...] }` block. For the continuation of the project, however, this is not relevant, and therefore it was omitted.
@@ -69,4 +69,10 @@ Zur verfügung stehende, versionierte Anwendungen:
 
 A multi-node Kubernetes infrastructure must be deployed on the OpenStack environment, hosting a containerized and versionable application with scalability and external accessibility.
 
-In order to use kubernetes, the distro utulize
+K3s bietet sich an als passende Kubernetes Distro für dieses Projekt. Der hauptgrund beruht auf dem gerigem speicher, den k3s benötigt verglichen mit anderen Kubernetes distrobutions. Dadurch, dass sich der zugängliche Speicher dieses Projekts auf 10 GB beschränkt (es gingen theoretisch auch mehr, jedoch haben dadurch weniger Stundenten Platz um Instanzen zu starten), bietet sich k3s mit seinen geringen [requirements](https://docs.k3s.io/installation/requirements) besonders gut an. Außerdem ist die Installation schnell und gut [dokumentiert](https://docs.k3s.io/installation).
+
+Die Installation aller komponenten, um die Anwendung zum laufen zu bringen, passiert in `task_1/nodes/master.sh` und `task_1/nodes/worker.sh`. Diese Files werden automatisch mit dem Start der instanzen ausgeführt, und beinhalten 3 Schritte:
+
+1. k3s Installieren (master & worker)
+2. NFS Server installieren (master & worker)
+3. Kubernetes entities starten (master)

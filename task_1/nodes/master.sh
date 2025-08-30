@@ -29,16 +29,17 @@ sudo mv linux-amd64/helm /usr/local/sbin
 rm -rf linux-amd64
 rm helm-v3.18.3-linux-amd64.tar.gz
 
-# CONFIG HELM ACCESS
-echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
-source ~/.bashrc
-
-# ADD PROMETHEUS
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-helm install prometheus prometheus-community/prometheus
-
 # NFS CLIENT SETUP ON MASTER
 wget https://raw.githubusercontent.com/silasschroeder/files/main/k8s-entities.yaml
 envsubst < k8s-entities.yaml > bucket.yaml && mv bucket.yaml k8s-entities.yaml # REPLACE ${MASTER_IP} IN k8s-entities.yaml
 kubectl apply -f k8s-entities.yaml
+
+# ADD PROMETHEUS
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+# # CONFIG HELM ACCESS
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+source ~/.bashrc
+
+helm install prometheus prometheus-community/prometheus

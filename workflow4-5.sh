@@ -64,4 +64,4 @@ kubectl apply -f https://raw.githubusercontent.com/silasschroeder/files/main/tas
 kubectl apply -f https://raw.githubusercontent.com/silasschroeder/files/main/task_5/faust.yaml
 kubectl apply -f https://raw.githubusercontent.com/silasschroeder/files/main/task_5/web.yaml
 
-kubectl apply -f stress.yaml
+kubectl apply -f https://raw.githubusercontent.com/silasschroeder/files/main/task_5/stress.yaml
