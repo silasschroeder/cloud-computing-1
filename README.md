@@ -97,8 +97,39 @@ After a few minutes, the infrastructure is ready.
 
 ## Task 2 — Versioned Infrastructure and Application
 
-Task 2 was handled by another group member.
-The goal was to deploy a **versionable stateful application** and demonstrate versioning, rollback, and deletion of infrastructure versions.
+**Goal**: Deploy versioned infrastructure with automated rollback capabilities and demonstrate infrastructure version management.
+
+### Implementation
+
+Task 2 extends the basic infrastructure from Task 1 with sophisticated version management using Git tags and automated deployment scripts. The system provides:
+
+- **Versioned deployments**: Each infrastructure version is tagged in Git and deployed with corresponding application versions
+- **Automated rollback**: Ability to rollback to any previous infrastructure version using Git history
+- **Stateful application**: Containerized Node.js app with persistent storage and NFS shared volumes
+- **Version cleanup**: Tools for managing Git branches and tags to maintain repository cleanliness
+
+### Key Scripts
+
+Located in `task_2/`:
+
+- `deploy_version.sh` — Deploy new versioned infrastructure with K3s and stateful application
+- `rollback.sh` — Interactive rollback to previous versions using Git tags  
+- `destroy.sh` — Complete infrastructure teardown
+- `cleanup_versions.sh` — Git version and branch management
+
+### Workflow
+
+```sh
+cd task_2
+# Deploy new version
+./deploy_version.sh  # Creates Git tag, deploys infrastructure and app
+
+# Rollback if needed
+./rollback.sh        # Interactive selection of previous versions
+
+# Clean up when done
+./destroy.sh         # Destroy all resources
+```
 
 Available application images:
 
