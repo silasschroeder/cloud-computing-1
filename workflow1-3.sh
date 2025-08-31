@@ -14,7 +14,6 @@ tofu apply -auto-approve
 
 echo -e "90.0\n1.4" | ./deploy_version.sh
 
-
 echo -e "v90.0\nyes" | ./rollback.sh
 
 ./destroy.sh

@@ -20,7 +20,6 @@ resource "openstack_compute_instance_v2" "master" {
   flavor_name     = "mb1.small"
   security_groups = ["default"]
   key_pair        = "Jonas Public"
-  user_data       = file("${path.module}/master.sh")
 
   network {
     name = "DHBW"
@@ -37,9 +36,6 @@ resource "openstack_compute_instance_v2" "worker_nodes" {
   flavor_name     = "mb1.small"
   security_groups = ["default"]
   key_pair        = "Jonas Public"
-  user_data = templatefile("${path.module}/worker.sh", {
-    master_ip = openstack_compute_instance_v2.master.network.0.fixed_ip_v4
-  })
 
   network {
     name = "DHBW"
