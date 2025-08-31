@@ -1,6 +1,7 @@
 ############################################################
 #                          TASK 1                          #
 ############################################################
+# ON LOCAL MACHINE
 
 source env.sh
 tofu init
@@ -9,12 +10,14 @@ tofu apply -auto-approve
 ############################################################
 #                          TASK 2                          #
 ############################################################
+# ON LOCAL MACHINE
 
 # TODO
 
 ############################################################
 #                          TASK 3                          #
 ############################################################
+# ON MASTER NODE
 
 # ---------------------- Prometheus ------------------------
 
@@ -35,13 +38,14 @@ sudo kubectl port-forward --address 0.0.0.0 svc/prometheus-server 8888:80
 # open master_ip:8888 in browser
 # switch to "Graph" tab
 # enter query: kube_deployment_status_replicas{deployment="stateful-app"} + press enter
+# press "Enter" again to update the graph
+# watch in combination with the stress test below to see the number of replicas increase
 
 # ---------------- Horizontal Scalability ------------------
 
-# CHECK HORIZONTAL POD AUTOSCALER
+# START STRESS TEST
 sudo kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.0001; do wget -q -O- http://$(ip -o -4 addr show dev ens3 | awk '{print $4}' | cut -d/ -f1); done"
 
-# in another terminal
-watch sudo kubectl get hpa # check stress level
-watch sudo kubectl get pods # check pod count 
-# press "Enter" within prometheus behind the added query to update the graph (3 -> 4)
+# IN ANOTHER TERMINAL ON MASTER NODE
+watch sudo kubectl get hpa # CHECK STRESS LEVEL
+watch sudo kubectl get pods # CHECK NUMBER OF PODSh

@@ -1,8 +1,9 @@
-################################################################################
-#                               PREREQUISITES                                  #
-# - You must be SSH'd to the master node to execute the commands shown.        #
-# - Reduce master.sh and worker.sh to K3s setup only for a clean cluster.      #
-################################################################################
+#####################################################################################
+#                                 PREREQUISITES                                     #
+# - Reduce master.sh and worker.sh to K3s cluster setup                             #
+# - Run Task 1 commands again to create a k8s cluster clean of previous software    #
+#####################################################################################
+# ON MASTER NODE
 
 # INSTALL HELM
 wget https://get.helm.sh/helm-v3.18.3-linux-amd64.tar.gz
@@ -25,6 +26,7 @@ helm repo update
 ############################################################
 #                          TASK 4                          #
 ############################################################
+# ON MASTER NODE
 
 # HELM INITS
 helm install minio bitnami/minio -f https://raw.githubusercontent.com/silasschroeder/files/main/task_4/minio.yaml
@@ -58,6 +60,7 @@ mc cat pfisterer/models/naive_bayes_params.json
 ############################################################
 #                          TASK 5                          #
 ############################################################
+# ON MASTER NODE
 
 helm install strimzi strimzi/strimzi-kafka-operator
 helm install keda kedacore/keda # SCALER
