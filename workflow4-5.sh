@@ -1,6 +1,9 @@
-k3sup install --ip 141.72.13.246 --user ubuntu --ssh-key ~/.ssh/id_rsa --cluster --k3s-extra-args '--write-kubeconfig-mode 644'
-k3sup join --ip 141.72.13.196 --user ubuntu --ssh-key ~/.ssh/id_rsa --server-ip 141.72.13.246
-k3sup join --ip 141.72.13.58 --user ubuntu --ssh-key ~/.ssh/id_rsa --server-ip 141.72.13.246
+#####################################################################################
+#                                 PREREQUISITES                                     #
+# - Reduce master.sh and worker.sh to K3s cluster setup                             #
+# - Run Task 1 commands again to create a k8s cluster clean of previous software    #
+#####################################################################################
+# ON MASTER NODE
 
 # INSTALL HELM
 wget https://get.helm.sh/helm-v3.18.3-linux-amd64.tar.gz
@@ -23,6 +26,7 @@ helm repo update
 ############################################################
 #                          TASK 4                          #
 ############################################################
+# ON MASTER NODE
 
 # HELM INITS
 helm install minio bitnami/minio -f https://raw.githubusercontent.com/silasschroeder/files/main/task_4/minio.yaml
@@ -56,6 +60,7 @@ mc cat pfisterer/models/naive_bayes_params.json
 ############################################################
 #                          TASK 5                          #
 ############################################################
+# ON MASTER NODE
 
 helm install strimzi strimzi/strimzi-kafka-operator
 helm install keda kedacore/keda # SCALER
@@ -64,4 +69,4 @@ kubectl apply -f https://raw.githubusercontent.com/silasschroeder/files/main/tas
 kubectl apply -f https://raw.githubusercontent.com/silasschroeder/files/main/task_5/faust.yaml
 kubectl apply -f https://raw.githubusercontent.com/silasschroeder/files/main/task_5/web.yaml
 
-kubectl apply -f stress.yaml
+kubectl apply -f https://raw.githubusercontent.com/silasschroeder/files/main/task_5/stress.yaml

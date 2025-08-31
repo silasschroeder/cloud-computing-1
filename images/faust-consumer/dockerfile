@@ -1,5 +1,0 @@
-FROM python:3.8-slim
-WORKDIR /app
-RUN pip install faust s3fs numpy
-COPY app.py /app/
-CMD ["faust", "-A", "app", "worker", "-l", "info"]

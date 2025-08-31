@@ -1,5 +1,0 @@
-FROM daskdev/dask:latest-py3.10
-RUN pip install dask dask-ml s3fs
-
-WORKDIR /app
-COPY app.py /app/
