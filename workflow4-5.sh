@@ -1,6 +1,8 @@
-k3sup install --ip 141.72.13.246 --user ubuntu --ssh-key ~/.ssh/id_rsa --cluster --k3s-extra-args '--write-kubeconfig-mode 644'
-k3sup join --ip 141.72.13.196 --user ubuntu --ssh-key ~/.ssh/id_rsa --server-ip 141.72.13.246
-k3sup join --ip 141.72.13.58 --user ubuntu --ssh-key ~/.ssh/id_rsa --server-ip 141.72.13.246
+################################################################################
+#                               PREREQUISITES                                  #
+# - You must be SSH'd to the master node to execute the commands shown.        #
+# - Reduce master.sh and worker.sh to K3s setup only for a clean cluster.      #
+################################################################################
 
 # INSTALL HELM
 wget https://get.helm.sh/helm-v3.18.3-linux-amd64.tar.gz

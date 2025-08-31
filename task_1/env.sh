@@ -1,3 +1,4 @@
+# DHBW OpenStack Login Credentials used by initialisation.tf
 export OS_AUTH_URL="https://stack.dhbw.cloud:5000"
 export OS_USERNAME="pfisterer-cloud-lecture"
 export OS_PASSWORD="ss2025"

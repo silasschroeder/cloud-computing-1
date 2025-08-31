@@ -1,3 +1,21 @@
+/**
+ * Simple Express + Kafka front-end:
+ * - Serves an HTML form for 30 numeric features.
+ * - Sends the form payload as JSON to Kafka topic "tracking-data".
+ * - Correlates responses from topic "model-results" using a correlationId header.
+ * - Uses instanceId to ensure this instance only consumes its own replies.
+ *
+ * Architecture notes:
+ * - A single shared Kafka consumer is started to read all results.
+ * - In-flight HTTP requests are tracked in a Map keyed by correlationId (pending).
+ * - When a matching Kafka result arrives, the pending Promise is resolved.
+ * - Timeouts clean up pending entries to avoid memory leaks.
+ *
+ * Caveats:
+ * - This is a demo. Add input validation, rate limiting, and stronger error handling for production.
+ * - Make sure both Kafka topics exist and the broker address is reachable from this service.
+ */
+
 const { Kafka } = require("kafkajs");
 const express = require("express");
 
@@ -6,29 +24,47 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 const os = require("node:os");
+
+// Instance identity used to filter responses meant for this process
 const INSTANCE_ID =
   process.env.INSTANCE_ID || process.env.HOSTNAME || os.hostname();
+
+// Kafka configuration
 const KAFKA_BROKERS = ["my-kafka-cluster-kafka-bootstrap:9092"];
 const CLIENT_ID = "consumer-id";
 const TRACKING_TOPIC = "tracking-data";
 const RESULTS_TOPIC = "model-results";
 
+// Kafka client + producer and a long-lived consumer for results
 const kafka = new Kafka({ clientId: CLIENT_ID, brokers: KAFKA_BROKERS });
 const producer = kafka.producer();
 const consumer = kafka.consumer({
+  // Use a group per instance to ensure each instance gets its own result messages
   groupId: `${CLIENT_ID}-results-${INSTANCE_ID}`,
 });
-const pending = new Map(); // correlationId -> { resolve, reject, timer }
 
+// In-flight requests: correlationId -> { resolve, reject, timer }
+const pending = new Map();
+
+/**
+ * Start a shared results consumer:
+ * - Subscribes to "model-results".
+ * - For each message, checks correlationId and instanceId headers.
+ * - If it matches a pending HTTP request, resolves it and clears its timeout.
+ */
 async function startResultsConsumer() {
   await consumer.connect();
   await consumer.subscribe({ topic: RESULTS_TOPIC, fromBeginning: false });
   await consumer.run({
     eachMessage: async ({ message }) => {
+      // kafkajs headers are Buffers (or undefined) -> convert to string
       const cid = message.headers?.correlationId?.toString();
       const inst = message.headers?.instanceId?.toString();
-      if (!cid || inst !== INSTANCE_ID) return; // nur eigene Antworten
 
+      // Only handle replies addressed to this instance and having a correlationId
+      if (!cid || inst !== INSTANCE_ID) return;
+
+      // Result payload is JSON-encoded boolean in our pipeline; fall back to raw string if not JSON
       const raw = message.value ? message.value.toString() : "";
       let parsed;
       try {
@@ -37,6 +73,7 @@ async function startResultsConsumer() {
         parsed = raw;
       }
 
+      // Resolve the matching waiter, if any
       const waiter = pending.get(cid);
       if (waiter) {
         clearTimeout(waiter.timer);
@@ -47,6 +84,10 @@ async function startResultsConsumer() {
   });
 }
 
+/**
+ * Helper to send a single message to the tracking topic.
+ * The headers should include correlationId and instanceId for round-trip correlation.
+ */
 async function sendTrackingMessage(data, headers = {}) {
   return producer.send({
     topic: TRACKING_TOPIC,
@@ -54,7 +95,11 @@ async function sendTrackingMessage(data, headers = {}) {
   });
 }
 
-// Warte auf genau eine Antwort mit passender correlationId
+/**
+ * Alternative one-off consumer approach (not used by the current flow).
+ * Spawns a temporary consumer that stops after receiving exactly one matching result.
+ * Kept for reference; the shared-consumer + pending-map approach is more efficient.
+ */
 async function consumeOneResult({ correlationId, timeoutMs = 10000 }) {
   const consumer = kafka.consumer({
     groupId: `${CLIENT_ID}-results-${Date.now()}-${Math.random()
@@ -107,7 +152,7 @@ async function consumeOneResult({ correlationId, timeoutMs = 10000 }) {
   });
 }
 
-// HTML form
+// Serve a minimal HTML form to collect 30 features and submit via fetch()
 app.get("/", (req, res) => {
   const placeholders = [
     "radius1",
@@ -141,6 +186,8 @@ app.get("/", (req, res) => {
     "symmetry3",
     "fractal_dimension3",
   ];
+
+  // Dynamically render 30 input fields
   const inputFields = placeholders
     .map(
       (p) =>
@@ -148,6 +195,9 @@ app.get("/", (req, res) => {
     )
     .join("\n");
 
+  // Basic client-side helpers:
+  // - fillRandomValues: fill inputs with random numbers for testing
+  // - handleSubmit: POST JSON to /send and display the boolean result
   res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kafka Input Form</title>
   <script>
@@ -176,13 +226,20 @@ app.get("/", (req, res) => {
   </body></html>`);
 });
 
-// Senden und auf Antwort warten
-// Senden und auf Antwort warten (nutzt Pending-Map statt temporärem Consumer)
+/**
+ * Send the payload to Kafka and wait for exactly one correlated reply.
+ * - Generates a unique correlationId.
+ * - Registers a resolver in the pending map with a timeout.
+ * - Sends correlationId and instanceId as headers so the processor can echo them back.
+ * - Awaits the shared consumer to resolve this HTTP request when the result arrives.
+ */
 app.post("/send", async (req, res) => {
   try {
     const correlationId = `${CLIENT_ID}-${Date.now()}-${Math.random()
       .toString(16)
       .slice(2)}`;
+
+    // Create a promise that will be resolved by startResultsConsumer() on matching result
     const resultPromise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pending.delete(correlationId);
@@ -190,11 +247,13 @@ app.post("/send", async (req, res) => {
       }, 15000);
       pending.set(correlationId, { resolve, reject, timer });
     });
-    // instanceId mitsenden
+
+    // Include instanceId so downstream can route the reply back to this instance
     await sendTrackingMessage(req.body, {
       correlationId,
       instanceId: INSTANCE_ID,
     });
+
     const result = await resultPromise;
     res.json({ ok: true, result });
   } catch (err) {
@@ -205,6 +264,11 @@ app.post("/send", async (req, res) => {
   }
 });
 
+/**
+ * App bootstrap:
+ * - Connect producer, start the results consumer, then start the HTTP server.
+ * - If startup fails, exit non-zero so orchestration can restart the container.
+ */
 async function start() {
   await producer.connect();
   await startResultsConsumer();
