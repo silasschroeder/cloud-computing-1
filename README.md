@@ -8,7 +8,7 @@ This repository contains the portfolio submission for the module **Cloud Computi
 Group members:
 
 - Maya Seifert (`8252799`)
-- Jonas Giessler (`TODO`)
+- Jonas Giessler (`2445660`)
 - Christian Fischer (`3105350`)
 - Sarah Wonke (`8926805`)
 - Silas Schröder (`1653329`)
